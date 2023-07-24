@@ -76,10 +76,33 @@ module Db = struct
     | ((None, _), arr) -> (prev_t, arr)
 
   let _delete _ tree = tree
-  (* let rec search t (min_key, max_key) = 
+  (* min_key tiene que estar en t, de lo contrario devolverá None, aunque haya en el rango
+     (min_key, max_key] *)
+  let rec search (t, arr) (min_key, max_key) =
+    let traverse arr from =
+      let rec aux (l: int list) i =
+        if i >= (Array.length arr) then 
+          l
+        else  
+          let key = get_pkey (Nil, arr.(i), 0) in
+          if key > max_key then l
+          else
+            aux (l@[arr.(i)]) (i+1)
+      in
+      aux [] from
+    in
     match t with
-    | Nil -> None
-    | Node [(Nil, key, _)] *)
+    | Nil
+    | Node [(Nil, _, _)] -> None
+    | Node ((Nil, key, ind) :: _) when min_key = key ->
+      (* search through array from min_key to max_key *)
+      Some (traverse arr ind)
+    | Node ((Nil, _, _) :: l) -> search ((Node l), arr) (min_key, max_key)
+    | Node [(ch, _, _)] -> search (ch, arr) (min_key, max_key)
+    | Node ((ch, key, _) :: _) when min_key < key -> search (ch, arr) (min_key, max_key)
+    | Node ((_, _, _) :: l) -> search ((Node l), arr) (min_key, max_key)
+    | _ -> None
+      
   let rec draw_tree t = 
     match t with
     | Nil
@@ -105,12 +128,6 @@ end
 
 exception StopMain
 
-let process_query c v t =
-  match c with
-  | -1 -> raise StopMain
-  | 0 -> Db.add t v
-  | _ -> t
-
 let () = 
   let (tree, arr) = Db.empty in
   let (tree, arr) = (ref tree, ref arr) in
@@ -118,11 +135,21 @@ let () =
     while true do
       let tokenized = String.split_on_char ' ' (read_line ()) in
       let code = int_of_string (List.nth tokenized 0) in
-      let key_or_value = int_of_string (List.nth tokenized 1) in
-      let (t, a) = process_query code key_or_value (!tree, !arr) in
-      tree := t; arr := a;
-      Db.draw_tree !tree;
-      Db.draw_leafs !arr
+      if code = 1 then 
+        let key_or_value = (
+          int_of_string (List.nth tokenized 1),
+          int_of_string (List.nth tokenized 2)
+        ) in
+        match Db.search (!tree, !arr) key_or_value with
+        | Some l -> Printf.printf "["; List.iter (fun v -> Printf.printf "%d, " v) l; Printf.printf "]\n"
+        | None -> Printf.printf "No se han encontrado valores con esas clave\n"
+      else if code = 0 then
+        let v = int_of_string (List.nth tokenized 1) in
+        let (t, a) = Db.add (!tree, !arr) v in
+        tree := t; arr := a;    
+        Db.draw_tree !tree;
+        Db.draw_leafs !arr
+      else raise StopMain 
     done
   with StopMain -> print_endline "stopped execution";
 
