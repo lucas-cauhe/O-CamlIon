@@ -1,0 +1,4 @@
+(executable
+ (public_name bd_b_plus)
+ (name main)
+ (libraries bd_b_plus))
