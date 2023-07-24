@@ -1,10 +1,9 @@
-(* let to_string =
-  format_of_string "%d" *)
-
-(* type database = Nil | Node of (database * int * int option) list *)
 open Bd_b_plus.Add
 
 exception BadTree
+
+(* El 3 elemento de las tuplas de Node se debería quitar
+   ya que lo guarda el array *)
 
 let arrays_differ_at_pos ar1 ar2 = 
   let len1 = Array.length ar1 in
@@ -24,39 +23,39 @@ let arrays_differ_at_pos ar1 ar2 =
 
 let rec update_leafs n t inserted_key = 
   match t with
-  | (Node [(Nil, _, None, ind)]) as c when ind < n -> c
-  | Node [(Nil, key, None, ind)] -> 
+  | (Node [(Nil, _, ind)]) as c when ind < n -> c
+  | Node [(Nil, key, ind)] -> 
     if not (inserted_key = key) then
-      Node [(Nil, key, None, ind+1)]
-    else Node [(Nil, key, None, ind)]
+      Node [(Nil, key, ind+1)]
+    else Node [(Nil, key, ind)]
 
-  | Node ((Nil, _, _, ind) as h :: l) when ind < n -> 
+  | Node ((Nil, _, ind) as h :: l) when ind < n -> 
     let updated = match update_leafs n (Node l) inserted_key with 
       | Node s -> s
       | _ -> raise BadTree
     in
     Node (h::updated)
 
-  | Node ((Nil, key, v, ind) as h :: l) ->
+  | Node ((Nil, key, ind) as h :: l) ->
     let updated = match update_leafs n (Node l) inserted_key with
       | Node s -> s
       | _ -> raise BadTree
     in
     if not (inserted_key = key) then
-      Node ((Nil, key, v, ind+1)::updated)
+      Node ((Nil, key, ind+1)::updated)
     else Node (h::updated)
   
-  | Node [(ch, k, None, i)] ->
+  | Node [(ch, k, i)] ->
     let ch_updated = update_leafs n ch inserted_key in
-    Node [(ch_updated, k, None, i)]
+    Node [(ch_updated, k, i)]
     
-  | Node ((ch, k, None, i) :: l) -> 
+  | Node ((ch, k, i) :: l) -> 
     let ch_updated = update_leafs n ch inserted_key in
     let rest_updated = match update_leafs n (Node l) inserted_key with 
       | Node s -> s
       | _ -> raise BadTree
     in
-    Node ((ch_updated, k, None, i) :: rest_updated)
+    Node ((ch_updated, k, i) :: rest_updated)
   
   | Nil -> t
 
@@ -67,7 +66,7 @@ module Db = struct
   let empty = (Nil, [||])
     
   let add t v = 
-    let key = get_pkey (Nil, v, None, 0) in
+    let key = get_pkey (Nil, v, 0) in
     let (prev_t, prev_arr) = t in
     match Bd_b_plus.Add.add t v with
     | ((Some t', _), arr) -> 
@@ -77,19 +76,22 @@ module Db = struct
     | ((None, _), arr) -> (prev_t, arr)
 
   let _delete _ tree = tree
-  let _search _ _ = Some 1
+  (* let rec search t (min_key, max_key) = 
+    match t with
+    | Nil -> None
+    | Node [(Nil, key, _)] *)
   let rec draw_tree t = 
     match t with
     | Nil
-    | Node [(Nil, _, None, _)] -> Printf.printf "\n"
-    | Node ((Nil, key, Some _, _) :: l) ->
+    | Node [(Nil, _, _)] -> Printf.printf "\n"
+    | Node ((Nil, key, _) :: l) ->
       Printf.printf "Hoja %d " key;
       draw_tree (Node l)
-    | Node [(ch, _, None, _)] ->
+    | Node [(ch, _, _)] ->
         Printf.printf "---- Hijos de centinela ----\n";
         draw_tree ch;
         Printf.printf "---- Fin hijos de centinela ----\n"
-    | Node ((ch, key, None, _) :: l) ->
+    | Node ((ch, key, _) :: l) ->
         Printf.printf "---- Hijos de %d ----\n" key;
         draw_tree ch;
         Printf.printf "---- Fin hijos de %d ----\n" key;
