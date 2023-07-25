@@ -1,5 +1,7 @@
+open Bigarray
 (* tuple contains: (recursive children, key, number of leafs to the left) *)
 type database = Nil | Node of (database * int * int) list
+type barr = (int, int_elt, c_layout) Array1.t
 
 (* you really dont care about the 4th element of the Node list tuple in non leafs nodes
    since only the leafs have useful information there *)
@@ -8,7 +10,7 @@ let get_pkey (v: database * int  * int) =
   let (_, key, _) = v in
   key
 
-let (>>=) (m : (database option * bool) * int array) (k : (database * bool) * int array -> (database option * bool) * int array) : (database option * bool) * int array =
+let (>>=) (m : (database option * bool) * barr) (k : (database * bool) * barr -> (database option * bool) * barr) : (database option * bool) * barr =
   let ((datb, moved), res_llist) = m in
   match datb with
   | None -> ((None, moved), res_llist)
@@ -42,19 +44,19 @@ let divide l =
   ]
 
 let insert_at pos ar v = 
-  let len = Array.length ar in
-  Array.init (len+1) (fun ind -> 
+  let len = Array1.dim ar in
+  Array1.init int c_layout (len+1) (fun ind -> 
     if ind = pos then v
-    else if ind < pos then ar.(ind)
-    else ar.(ind-1) )
+    else if ind < pos then ar.{ind}
+    else ar.{ind-1} )
 
-let add (t, llist) (v: int) : (database option * bool) * int array = 
+let add (t, llist) (v: int) : (database option * bool) * barr = 
   let key = get_pkey (Nil, v, 0) in
   let max_degree = 3 in
-  let rec aux t' reg_length : (database option * bool) * int array (* (árbol resultante,
+  let rec aux t' reg_length : (database option * bool) * barr (* (árbol resultante,
   ha_cambiado el hijo *) = 
     match t' with
-    | Nil (* arbol vacío *) -> ((Some (Node [(Nil, key, 0); (Nil, key, 0)]), false), Array.make 1 v)
+    | Nil (* arbol vacío *) -> ((Some (Node [(Nil, key, 0); (Nil, key, 0)]), false), Array1.init int c_layout 1 (fun _ ->  v ))
 
     | Node ((_, k, _) :: _) when k=key (* clave primaria duplicada *) -> ((None, false),  llist)
 

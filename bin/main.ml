@@ -1,13 +1,17 @@
 open Bd_b_plus.Add
+open Bigarray
 
 exception BadTree
 
-(* El 3 elemento de las tuplas de Node se debería quitar
-   ya que lo guarda el array *)
+let iter_bigarr (f: (int -> unit) ) (arr: barr) = 
+  for i = 0 to ((Array1.dim arr)-1) do
+    f arr.{i}
+  done
+
 
 let arrays_differ_at_pos ar1 ar2 = 
-  let len1 = Array.length ar1 in
-  let len2 = Array.length ar2 in
+  let len1 = Bigarray.Array1.dim ar1 in
+  let len2 = Bigarray.Array1.dim ar2 in
   if len1 = 0 || len2 = 0 then
     1
   else
@@ -15,7 +19,7 @@ let arrays_differ_at_pos ar1 ar2 =
     let mn = min len1 len2 in
     let pos = ref (-1) in
     let () = for i = 0 to mn-1 do
-      if not (ar1.(i) = ar2.(i)) then found := true; pos := i
+      if not (ar1.{i} = ar2.{i}) then found := true; pos := i
     done
     in
     if !found then !pos
@@ -63,7 +67,7 @@ let rec update_leafs n t inserted_key =
 
 module Db = struct 
   
-  let empty = (Nil, [||])
+  let empty = (Nil, Array1.create int c_layout 0)
     
   let add t v = 
     let key = get_pkey (Nil, v, 0) in
@@ -81,13 +85,13 @@ module Db = struct
   let rec search (t, arr) (min_key, max_key) =
     let traverse arr from =
       let rec aux (l: int list) i =
-        if i >= (Array.length arr) then 
+        if i >= (Bigarray.Array1.dim arr) then 
           l
         else  
-          let key = get_pkey (Nil, arr.(i), 0) in
+          let key = get_pkey (Nil, arr.{i}, 0) in
           if key > max_key then l
           else
-            aux (l@[arr.(i)]) (i+1)
+            aux (l@[arr.{i}]) (i+1)
       in
       aux [] from
     in
@@ -122,7 +126,7 @@ module Db = struct
     | _ -> raise BadTree
   
   let draw_leafs a = 
-    Array.iter (fun x -> Printf.printf "%d -> " x) a;
+    iter_bigarr (fun x -> Printf.printf "%d -> " x) a;
     print_endline ""
 end
 
