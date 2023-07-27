@@ -3,9 +3,6 @@ open Bigarray
 type 'a database = Nil | Node of ('a database * 'a * int) list
 type barr = (int, int_elt, c_layout) Array1.t
 
-let get_pkey (v: 'a database * 'a  * int) = 
-  let (_, key, _) = v in
-  key
 
 (* Deshace un option en el caso de que sea Some _ y lo procesa según una función f *)
 let (>>=) (m : ('a database option * bool) * barr) (f : ('a database * bool) * barr -> ('a database option * bool) * barr) : ('a database option * bool) * barr =
@@ -30,7 +27,7 @@ let rec drop l n =
     clave es la del tercer elemento (la mediana) de la lista original
     *)
 let divide l = 
-  let third_pkey = get_pkey (List.nth l 2) in
+  let (_, third_pkey, _) = List.nth l 2 in
   let (cent, taker) = match (List.nth l 2) with
   | (Nil, _, _) -> ((Nil, third_pkey, 0), 2)
   | (node, _, _) -> ((node, third_pkey, 0), 3) in
@@ -137,10 +134,9 @@ let insert (t, llist) (v: int) key : ('a database option * bool) * barr =
             ((Some (Node (h::rt)), false), res_llist)
         )
     | Node ((s, k, _) :: l) -> (* Investiga por debajo *)
-(*the first to receive moved=true, means its child got moved, update
-           * current register with resulting tree and then check if the
-           * resulting register needs to get splitted eventually returning a
-           * true moved value *)
+    (* el primer nodo en recibir moved=true, significará que su hijo se ha dividido; actualiza
+       el registro actual con el árbol resultante y comprueba si el registro resultante necesita
+       ser dividido devolviendo moved a true si es necesario*)
 
         aux s 0 >>= (fun ((prt, moved), res_llist) ->
           let rt = match prt with 

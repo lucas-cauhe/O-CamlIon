@@ -5,16 +5,17 @@ exception BadTree
 
 (* --- DELETE OPERATIONS --- *)
 
-let visit_leafs t = 
+let visit_leafs t key_to_omit = 
   let rec aux t' l = 
     match t' with
     | Nil
-    | Node [_] -> l
+    | Node []
+    | Node [(Nil, _, _)] -> l
     | Node ((Nil, key, _) :: tl) -> 
-      aux (Node tl) (l @ [key])
+      if key = key_to_omit then aux (Node tl) l
+      else aux (Node tl) (l @ [key])
     | Node ((ch, _, _) :: tl) ->
       aux (Node tl) (aux ch l)
-    | _ -> l
   in
   aux t []
 
@@ -135,7 +136,8 @@ module Db = struct
     match search (t, arr) key with
     | Some (_, ind) ->
       let result_array = delete_ind arr ind in
-      build_tree_from_array result_array (visit_leafs t)
+      let leafs = visit_leafs t key in
+      build_tree_from_array result_array leafs
     | _ -> (t, arr)
     
   
@@ -190,7 +192,7 @@ let () =
         match Db.search (!tree, !arr) key with
         | Some (v, _) -> Printf.printf "%d\n" v
         | None -> Printf.printf "No se han encontrado valores con esas clave\n"
-        
+
       else if code = 2 then
         let v = int_of_string (List.nth tokenized 1) in
         let (t, a) = Db.delete (!tree, !arr) v in
