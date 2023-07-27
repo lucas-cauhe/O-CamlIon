@@ -118,8 +118,6 @@ module Db : Bd_b_plus.B_plus_sig.DB = struct
       (final_tree, arr)
     | ((None, _), arr) -> (prev_t, arr)
 
-(* min_key tiene que estar en t, de lo contrario devolverá None, aunque haya en el rango
-     (min_key, max_key] *)
   let rec search (t, arr) k =
     match t with
     | Nil
