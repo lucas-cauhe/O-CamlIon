@@ -5,7 +5,7 @@ exception BadTree
 
 (* --- DELETE OPERATIONS --- *)
 
-let visit_leafs t key_to_omit = 
+let visit_leaves t key_to_omit = 
   let rec aux t' l = 
     match t' with
     | Nil
@@ -63,7 +63,7 @@ let arrays_differ_at_pos ar1 ar2 =
     in
     aux 0
 
-let rec update_leafs n t inserted_key = 
+let rec update_leaves n t inserted_key = 
   match t with
   | (Node [(Nil, _, ind)]) as c when ind < n -> c
   | Node [(Nil, key, ind)] -> 
@@ -72,14 +72,14 @@ let rec update_leafs n t inserted_key =
     else Node [(Nil, key, ind)]
 
   | Node ((Nil, _, ind) as h :: l) when ind < n -> 
-    let updated = match update_leafs n (Node l) inserted_key with 
+    let updated = match update_leaves n (Node l) inserted_key with 
       | Node s -> s
       | _ -> raise BadTree
     in
     Node (h::updated)
 
   | Node ((Nil, key, ind) as h :: l) ->
-    let updated = match update_leafs n (Node l) inserted_key with
+    let updated = match update_leaves n (Node l) inserted_key with
       | Node s -> s
       | _ -> raise BadTree
     in
@@ -88,12 +88,12 @@ let rec update_leafs n t inserted_key =
     else Node (h::updated)
   
   | Node [(ch, k, i)] ->
-    let ch_updated = update_leafs n ch inserted_key in
+    let ch_updated = update_leaves n ch inserted_key in
     Node [(ch_updated, k, i)]
     
   | Node ((ch, k, i) :: l) -> 
-    let ch_updated = update_leafs n ch inserted_key in
-    let rest_updated = match update_leafs n (Node l) inserted_key with 
+    let ch_updated = update_leaves n ch inserted_key in
+    let rest_updated = match update_leaves n (Node l) inserted_key with 
       | Node s -> s
       | _ -> raise BadTree
     in
@@ -103,8 +103,10 @@ let rec update_leafs n t inserted_key =
 
   | _ -> t
 
-module Db = struct 
-  
+module Db : Bd_b_plus.B_plus_sig.DB = struct 
+  type 'a db = 'a database
+  type leaf_nodes = barr
+
   let empty = (Nil, Array1.create int c_layout 0)
     
   let insert t v k = 
@@ -112,7 +114,7 @@ module Db = struct
     match Bd_b_plus.Insert.insert t v k with
     | ((Some t', _), arr) -> 
       (* update the leaf nodes after the inserted one *)
-      let final_tree = update_leafs (arrays_differ_at_pos prev_arr arr) t' k in
+      let final_tree = update_leaves (arrays_differ_at_pos prev_arr arr) t' k in
       (final_tree, arr)
     | ((None, _), arr) -> (prev_t, arr)
 
@@ -137,8 +139,8 @@ module Db = struct
       let result_array = delete_ind arr ind in
       if Array1.dim result_array = 0 then (Nil, Array1.create int c_layout 0)
       else
-        let leafs = visit_leafs t key in
-        build_tree_from_array result_array leafs
+        let leaves = visit_leaves t key in
+        build_tree_from_array result_array leaves
     | _ -> (t, arr)
     
   
@@ -146,9 +148,9 @@ module Db = struct
     match t with
     | Nil
     | Node [(Nil, _, _)] -> Printf.printf "\n"
-    | Node ((Nil, key, ind) :: l) ->
-      Printf.printf "Hoja (";
-      printer key; Printf.printf ", %d) " ind;
+    | Node ((Nil, key, _) :: l) ->
+      Printf.printf "Hoja ";
+      printer key;
       draw_tree (Node l) printer
     | Node [(ch, _, _)] ->
         Printf.printf "---- Hijos de centinela ----\n";
@@ -163,7 +165,7 @@ module Db = struct
 
   
   
-  let draw_leafs a = 
+  let draw_leaves a = 
     iter_bigarr (fun x -> Printf.printf "%d -> " x) a;
     print_endline ""
 end
@@ -186,7 +188,7 @@ let () =
         let (t, a) = Db.insert (!tree, !arr) v k in
         tree := t; arr := a;    
         Db.draw_tree !tree printer;
-        Db.draw_leafs !arr
+        Db.draw_leaves !arr
 
       else if code = 1 then 
         let key = int_of_string (List.nth tokenized 1) in
@@ -199,7 +201,7 @@ let () =
         let (t, a) = Db.delete (!tree, !arr) v in
         tree := t; arr := a;    
         Db.draw_tree !tree printer;
-        Db.draw_leafs !arr
+        Db.draw_leaves !arr
         
       else raise StopMain 
     done
@@ -213,10 +215,10 @@ let () =
   let (tree, arr) = t in
   let string_printer s = Printf.printf "\"%s\" " s in
   Db.draw_tree tree string_printer;
-  Db.draw_leafs arr;
+  Db.draw_leaves arr;
   let t = Db.delete t "hello" in
   let (tree, arr) = t in
   Db.draw_tree tree string_printer;
-  Db.draw_leafs arr
+  Db.draw_leaves arr
 ;; *)
 

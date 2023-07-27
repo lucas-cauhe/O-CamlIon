@@ -1,14 +1,12 @@
 exception BadTree
 
-module type KEYS = sig
-  type a
-  val get_fk : 'o -> a
-  val get_pkey : 'o -> a
+module type DB = sig
+  type 'a db
+  type leaf_nodes
+  val empty : 'a db * leaf_nodes
+  val search : 'a db * leaf_nodes -> 'a -> (int * int) option
+  val insert : 'a db * leaf_nodes -> int -> 'a -> 'a db * leaf_nodes
+  val delete : 'a db * leaf_nodes -> 'a -> 'a db * leaf_nodes
+  val draw_tree : 'a db -> ('a -> unit) -> unit
+  val draw_leaves : leaf_nodes -> unit
 end
-
-(* module type DB = sig
-  val search : 'key -> 'key t -> int option
-  val add : 'v -> 'key t -> int option
-  val delete : 'key -> 'key t -> 'key t
-  val draw : int t -> unit
-end *)
