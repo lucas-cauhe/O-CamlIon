@@ -54,15 +54,14 @@ let arrays_differ_at_pos ar1 ar2 =
   if len1 = 0 || len2 = 0 then
     1
   else
-    let found = ref false in
     let mn = min len1 len2 in
-    let pos = ref (-1) in
-    let () = for i = 0 to mn-1 do
-      if not (ar1.{i} = ar2.{i}) then found := true; pos := i
-    done
+    let rec aux i = 
+      if i = mn then mn
+      else
+        if not (ar1.{i} = ar2.{i}) then i
+        else aux (i+1)
     in
-    if !found then !pos
-    else mn
+    aux 0
 
 let rec update_leafs n t inserted_key = 
   match t with
