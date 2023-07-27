@@ -28,8 +28,9 @@ let rec drop l n =
     *)
 let divide l = 
   let (_, third_pkey, _) = List.nth l 2 in
+  let (_, _, snd_ind) = List.nth l 1 in
   let (cent, taker) = match (List.nth l 2) with
-  | (Nil, _, _) -> ((Nil, third_pkey, 0), 2)
+  | (Nil, _, _) -> ((Nil, third_pkey, snd_ind), 2)
   | (node, _, _) -> ((node, third_pkey, 0), 3) in
   let first_half = (take l 2) @ [cent] (*[l.(0), l.(1)] + centinela *) in
   let second_half = drop l taker (*[l.(3), l.(4)]*) in

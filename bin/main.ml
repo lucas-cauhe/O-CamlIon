@@ -136,8 +136,10 @@ module Db = struct
     match search (t, arr) key with
     | Some (_, ind) ->
       let result_array = delete_ind arr ind in
-      let leafs = visit_leafs t key in
-      build_tree_from_array result_array leafs
+      if Array1.dim result_array = 0 then (Nil, Array1.create int c_layout 0)
+      else
+        let leafs = visit_leafs t key in
+        build_tree_from_array result_array leafs
     | _ -> (t, arr)
     
   
@@ -145,9 +147,9 @@ module Db = struct
     match t with
     | Nil
     | Node [(Nil, _, _)] -> Printf.printf "\n"
-    | Node ((Nil, key, _) :: l) ->
-      Printf.printf "Hoja ";
-      printer key;
+    | Node ((Nil, key, ind) :: l) ->
+      Printf.printf "Hoja (";
+      printer key; Printf.printf ", %d) " ind;
       draw_tree (Node l) printer
     | Node [(ch, _, _)] ->
         Printf.printf "---- Hijos de centinela ----\n";
