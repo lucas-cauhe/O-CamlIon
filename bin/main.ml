@@ -1,34 +1,36 @@
-open Bd_b_plus.Add
+open Bd_b_plus.Insert
 open Bigarray
 
 exception BadTree
 
 (* --- DELETE OPERATIONS --- *)
 
+let visit_leafs t = 
+  let rec aux t' l = 
+    match t' with
+    | Nil
+    | Node [_] -> l
+    | Node ((Nil, key, _) :: tl) -> 
+      aux (Node tl) (l @ [key])
+    | Node ((ch, _, _) :: tl) ->
+      aux (Node tl) (aux ch l)
+    | _ -> l
+  in
+  aux t []
 
 let delete_ind arr ind = 
   Array1.init int c_layout ((Array1.dim arr)-1) (fun x -> 
     if x >= ind then arr.{x+1}
     else arr.{x})
 
-(* Like filter but only returns the first match, along with its index *)
-let filteri f ar = 
-  let rec aux i = 
-    if i = Array1.dim ar then None
-    else
-      if f ar.{i} then Some (ar.{i}, i)
-      else aux (i+1)
-  in
-  aux 0
-
 exception BuildTreeError
 
-let build_tree_from_array ar = 
+let build_tree_from_array ar keys = 
   let t = (Nil, Array1.create int c_layout 0) in
   let rec aux i tr = 
     if i = Array1.dim ar then tr
     else
-      let result_b_plus = match add tr ar.{i} with
+      let result_b_plus = match insert tr ar.{i} (List.nth keys i) with
       | ((Some t, _), a) -> (t, a)
       | _ -> raise BuildTreeError 
       in
@@ -43,7 +45,7 @@ let iter_bigarr (f: (int -> unit) ) (arr: barr) =
     f arr.{i}
   done
 
-(* --- ADD OPERATIONS --- *)
+(* --- INSERT OPERATIONS --- *)
 
 let arrays_differ_at_pos ar1 ar2 = 
   let len1 = Bigarray.Array1.dim ar1 in
@@ -105,107 +107,113 @@ module Db = struct
   
   let empty = (Nil, Array1.create int c_layout 0)
     
-  let add t v = 
-    let key = get_pkey (Nil, v, 0) in
+  let insert t v k = 
     let (prev_t, prev_arr) = t in
-    match Bd_b_plus.Add.add t v with
+    match Bd_b_plus.Insert.insert t v k with
     | ((Some t', _), arr) -> 
-      (* update the leaf nodes after the added one *)
-      let final_tree = update_leafs (arrays_differ_at_pos prev_arr arr) t' key in
+      (* update the leaf nodes after the inserted one *)
+      let final_tree = update_leafs (arrays_differ_at_pos prev_arr arr) t' k in
       (final_tree, arr)
     | ((None, _), arr) -> (prev_t, arr)
 
-  let delete (t, arr) key  = 
-    let key_exists = filteri (fun x -> 
-      let k = get_pkey (Nil, x, 0) in
-      k = key
-      ) arr
-    in
-    match key_exists with
-    | Some (_, ind_to_del) ->
-      let result_array = delete_ind arr ind_to_del in
-      build_tree_from_array result_array
-    | None -> (t, arr)
-  (* min_key tiene que estar en t, de lo contrario devolverá None, aunque haya en el rango
+(* min_key tiene que estar en t, de lo contrario devolverá None, aunque haya en el rango
      (min_key, max_key] *)
-  let rec search (t, arr) (min_key, max_key) =
-    let traverse arr from =
-      let rec aux (l: int list) i =
-        if i >= (Bigarray.Array1.dim arr) then 
-          l
-        else  
-          let key = get_pkey (Nil, arr.{i}, 0) in
-          if key > max_key then l
-          else
-            aux (l@[arr.{i}]) (i+1)
-      in
-      aux [] from
-    in
+  let rec search (t, arr) k =
     match t with
     | Nil
     | Node [(Nil, _, _)] -> None
-    | Node ((Nil, key, ind) :: _) when min_key = key ->
-      (* search through array from min_key to max_key *)
-      Some (traverse arr ind)
-    | Node ((Nil, _, _) :: l) -> search ((Node l), arr) (min_key, max_key)
-    | Node [(ch, _, _)] -> search (ch, arr) (min_key, max_key)
-    | Node ((ch, key, _) :: _) when min_key < key -> search (ch, arr) (min_key, max_key)
-    | Node ((_, _, _) :: l) -> search ((Node l), arr) (min_key, max_key)
+    | Node ((Nil, key, ind) :: _) when k = key ->
+      Some (arr.{ind}, ind)
+    | Node ((Nil, _, _) :: l) -> search ((Node l), arr) k
+    | Node [(ch, _, _)] -> search (ch, arr) k
+    | Node ((ch, key, _) :: _) when k < key -> search (ch, arr) k
+    | Node ((_, _, _) :: l) -> search ((Node l), arr) k
     | _ -> None
-      
-  let rec draw_tree t = 
+        
+
+  let delete (t, arr) key  = 
+    match search (t, arr) key with
+    | Some (_, ind) ->
+      let result_array = delete_ind arr ind in
+      build_tree_from_array result_array (visit_leafs t)
+    | _ -> (t, arr)
+    
+  
+  let rec draw_tree t printer = 
     match t with
     | Nil
     | Node [(Nil, _, _)] -> Printf.printf "\n"
     | Node ((Nil, key, _) :: l) ->
-      Printf.printf "Hoja %d " key;
-      draw_tree (Node l)
+      Printf.printf "Hoja ";
+      printer key;
+      draw_tree (Node l) printer
     | Node [(ch, _, _)] ->
         Printf.printf "---- Hijos de centinela ----\n";
-        draw_tree ch;
+        draw_tree ch printer;
         Printf.printf "---- Fin hijos de centinela ----\n"
     | Node ((ch, key, _) :: l) ->
-        Printf.printf "---- Hijos de %d ----\n" key;
-        draw_tree ch;
-        Printf.printf "---- Fin hijos de %d ----\n" key;
-        draw_tree (Node l)
+        Printf.printf "---- Hijos de "; printer key; print_endline "----";
+        draw_tree ch printer;
+        Printf.printf "---- Fin hijos de "; printer key; print_endline "----" ;
+        draw_tree (Node l) printer
     | _ -> raise BadTree
+
+  
   
   let draw_leafs a = 
     iter_bigarr (fun x -> Printf.printf "%d -> " x) a;
     print_endline ""
 end
 
+(* EJEMPLO DE USO 1 *)
+
 exception StopMain
 
 let () = 
   let (tree, arr) = Db.empty in
   let (tree, arr) = (ref tree, ref arr) in
+  let printer k = Printf.printf "%d " k in
   try
     while true do
       let tokenized = String.split_on_char ' ' (read_line ()) in
       let code = int_of_string (List.nth tokenized 0) in
       if code = 0 then
         let v = int_of_string (List.nth tokenized 1) in
-        let (t, a) = Db.add (!tree, !arr) v in
+        let k = int_of_string (List.nth tokenized 2) in
+        let (t, a) = Db.insert (!tree, !arr) v k in
         tree := t; arr := a;    
-        Db.draw_tree !tree;
+        Db.draw_tree !tree printer;
         Db.draw_leafs !arr
+
       else if code = 1 then 
-        let key_or_value = (
-          int_of_string (List.nth tokenized 1),
-          int_of_string (List.nth tokenized 2)
-        ) in
-        match Db.search (!tree, !arr) key_or_value with
-        | Some l -> Printf.printf "["; List.iter (fun v -> Printf.printf "%d, " v) l; Printf.printf "]\n"
+        let key = int_of_string (List.nth tokenized 1) in
+        match Db.search (!tree, !arr) key with
+        | Some (v, _) -> Printf.printf "%d\n" v
         | None -> Printf.printf "No se han encontrado valores con esas clave\n"
+        
       else if code = 2 then
         let v = int_of_string (List.nth tokenized 1) in
         let (t, a) = Db.delete (!tree, !arr) v in
         tree := t; arr := a;    
-        Db.draw_tree !tree;
+        Db.draw_tree !tree printer;
         Db.draw_leafs !arr
+        
       else raise StopMain 
     done
   with StopMain -> print_endline "stopped execution";
+
+  (* EJEMPLO DE USO 2 *)
+(* let () = 
+  let t = Db.empty in
+  let t = Db.insert t 2 "hello" in
+  let t = Db.insert t 3 "hellothree" in
+  let (tree, arr) = t in
+  let string_printer s = Printf.printf "\"%s\" " s in
+  Db.draw_tree tree string_printer;
+  Db.draw_leafs arr;
+  let t = Db.delete t "hello" in
+  let (tree, arr) = t in
+  Db.draw_tree tree string_printer;
+  Db.draw_leafs arr
+;; *)
 

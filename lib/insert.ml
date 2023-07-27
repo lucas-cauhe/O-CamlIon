@@ -1,20 +1,18 @@
 open Bigarray
 (* tuple contains: (recursive children, key, number of leafs to the left) *)
-type database = Nil | Node of (database * int * int) list
+type 'a database = Nil | Node of ('a database * 'a * int) list
 type barr = (int, int_elt, c_layout) Array1.t
 
-(* you really dont care about the 4th element of the Node list tuple in non leafs nodes
-   since only the leafs have useful information there *)
-
-let get_pkey (v: database * int  * int) = 
+let get_pkey (v: 'a database * 'a  * int) = 
   let (_, key, _) = v in
   key
 
-let (>>=) (m : (database option * bool) * barr) (k : (database * bool) * barr -> (database option * bool) * barr) : (database option * bool) * barr =
+(* Deshace un option en el caso de que sea Some _ y lo procesa según una función f *)
+let (>>=) (m : ('a database option * bool) * barr) (f : ('a database * bool) * barr -> ('a database option * bool) * barr) : ('a database option * bool) * barr =
   let ((datb, moved), res_llist) = m in
   match datb with
   | None -> ((None, moved), res_llist)
-  | Some x -> k ((x, moved), res_llist)
+  | Some x -> f ((x, moved), res_llist)
 
 let rec take (l: 'a list) n =
   match l with
@@ -28,9 +26,9 @@ let rec drop l n =
   | _ :: t when n>0 -> drop t (n-1)
   | l' -> l'
 
-(* Splits a list into two halfs and returns the resulting lists as the children
- * of the root node which contains the pkey of the third element from the
- * original list *)
+(* Divide la lista en dos y devuelve las listas resultantes como hijas the un nodo raíz cuya
+    clave es la del tercer elemento (la mediana) de la lista original
+    *)
 let divide l = 
   let third_pkey = get_pkey (List.nth l 2) in
   let (cent, taker) = match (List.nth l 2) with
@@ -40,7 +38,7 @@ let divide l =
   let second_half = drop l taker (*[l.(3), l.(4)]*) in
   Node [
     (Node first_half, third_pkey, 0);
-    (Node second_half, third_pkey (* this key is never going to beread *), 0)
+    (Node second_half, third_pkey (* esta clave no se va a leer *), 0)
   ]
 
 let insert_at pos ar v = 
@@ -50,18 +48,16 @@ let insert_at pos ar v =
     else if ind < pos then ar.{ind}
     else ar.{ind-1} )
 
-let add (t, llist) (v: int) : (database option * bool) * barr = 
-  let key = get_pkey (Nil, v, 0) in
-  let max_degree = 3 in
-  let rec aux t' reg_length : (database option * bool) * barr (* (árbol resultante,
-  ha_cambiado el hijo *) = 
+let insert (t, llist) (v: int) key : ('a database option * bool) * barr = 
+  let max_degree = 4 in
+  let rec aux t' reg_length : ('a database option * bool) * barr (* (árbol resultante, ha_cambiado el hijo *) = 
     match t' with
     | Nil (* arbol vacío *) -> ((Some (Node [(Nil, key, 0); (Nil, key, 0)]), false), Array1.init int c_layout 1 (fun _ ->  v ))
 
     | Node ((_, k, _) :: _) when k=key (* clave primaria duplicada *) -> ((None, false),  llist)
 
     | Node [(Nil, _, hleft)] (* Centinela, añadir aquí y mover el Centinela *) -> 
-      if reg_length = max_degree then (* Divides en dos y propagas *)
+      if reg_length = max_degree-1 then (* Divides en dos y propagas *)
         (* El árbol devuelto tendrá como raíz la clave del tercer elemento e
          * hijos el registro acutal a la mitad *)
 
@@ -71,7 +67,7 @@ let add (t, llist) (v: int) : (database option * bool) * barr =
   
 
     | Node ((Nil, k, hleft) as h :: l) when key < k (* Añadir nuevo objeto aquí *) ->
-        if (List.length l) + reg_length = max_degree then
+        if (List.length l) + reg_length = max_degree-1 then
           if reg_length = 0 then (* dividir y coger indice 2 *)
             ((Some (divide ([(Nil, key, hleft); h]@l)), true), insert_at hleft llist v)
           else ((Some (Node ([(Nil, key, hleft); h]@l)), true), insert_at hleft llist v)
@@ -117,7 +113,7 @@ let add (t, llist) (v: int) : (database option * bool) * barr =
             if reg_length = 0 then
               ((Some (Node result_list), false), res_llist)
             else
-             ((Some (Node result_list), reg_length+1 > 3), res_llist)
+             ((Some (Node result_list), reg_length+1 > max_degree-1), res_llist)
         else
           if reg_length = 0 then
            ((Some (Node [(rt, k, 0)]), false), res_llist)
@@ -160,12 +156,12 @@ let add (t, llist) (v: int) : (database option * bool) * barr =
             in
             let result_list = [new_element; (prev_el_new_tree, k, 0)]@l in
             if reg_length = 0 then
-              if List.length result_list > 4 then
+              if List.length result_list > max_degree then
                 ((Some (divide result_list), true), res_llist)
               else
                 ((Some (Node result_list), false), res_llist) (*Aquí cortas la propagación del moved*)
             else
-              let moving = reg_length + (List.length result_list) > 4 in
+              let moving = reg_length + (List.length result_list) > max_degree in
               ((Some (Node result_list), moving), res_llist)
           else 
             if reg_length = 0 then
