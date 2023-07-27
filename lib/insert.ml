@@ -11,6 +11,8 @@ let (>>=) (m : ('a database option * bool) * barr) (f : ('a database * bool) * b
   | None -> ((None, moved), res_llist)
   | Some x -> f ((x, moved), res_llist)
 
+(* funciones take y drop de Haskell *)
+
 let rec take (l: 'a list) n =
   match l with
   | [] -> []
@@ -41,6 +43,8 @@ let divide l =
     (Node second_half, third_pkey (* esta clave no se va a leer *), 0)
   ]
 
+(* val insert_at : int -> barr -> int *)
+(* Inserta un elemento <v> en el Bigarray <ar> en la posición <pos> y desplaza los elementos posteriores *)
 let insert_at pos ar v = 
   let len = Array1.dim ar in
   Array1.init int c_layout (len+1) (fun ind -> 
@@ -48,6 +52,8 @@ let insert_at pos ar v =
     else if ind < pos then ar.{ind}
     else ar.{ind-1} )
 
+(* val insert : 'a database -> int -> 'a -> ('a database option * bool) * barr *)
+(* Función interna de inserción *)
 let insert (t, llist) (v: int) key : ('a database option * bool) * barr = 
   let max_degree = 4 in
   let rec aux t' reg_length : ('a database option * bool) * barr (* (árbol resultante, ha_cambiado el hijo *) = 

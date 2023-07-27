@@ -5,6 +5,9 @@ exception BadTree
 
 (* --- DELETE OPERATIONS --- *)
 
+(* val visit_leaves : 'a database -> 'a -> 'a list *)
+(* Recorre todo el árbol <t> almacenando en una lista las claves de las hojas visitadas *)
+(* exceptuando aquella que sea igual a <key_to_omit> *)
 let visit_leaves t key_to_omit = 
   let rec aux t' l = 
     match t' with
@@ -19,6 +22,8 @@ let visit_leaves t key_to_omit =
   in
   aux t []
 
+(* val delete_ind : barr -> int -> barr *)
+(* Elimina el elemento <ind>-ésimo del Bigarray <arr> *)
 let delete_ind arr ind = 
   Array1.init int c_layout ((Array1.dim arr)-1) (fun x -> 
     if x >= ind then arr.{x+1}
@@ -26,6 +31,8 @@ let delete_ind arr ind =
 
 exception BuildTreeError
 
+(* val build_tree_from_array : barr -> 'a list -> 'a database * barr *)
+(* Construye un árbol B+ a partir de un array <ar> y una lista de claves <keys> *)
 let build_tree_from_array ar keys = 
   let t = (Nil, Array1.create int c_layout 0) in
   let rec aux i tr = 
@@ -41,6 +48,8 @@ let build_tree_from_array ar keys =
 
 (* --- DRAW OPERATIONS --- *)
 
+(* val iter_bigarr : (int -> unit) -> barr -> unit  *)
+(* Implementación del método iter de Array o List para Bigarray *)
 let iter_bigarr (f: (int -> unit) ) (arr: barr) = 
   for i = 0 to ((Array1.dim arr)-1) do
     f arr.{i}
@@ -48,6 +57,8 @@ let iter_bigarr (f: (int -> unit) ) (arr: barr) =
 
 (* --- INSERT OPERATIONS --- *)
 
+(* val arrays_differ_at_pos : barr -> barr -> ind *)
+(* Devuelve el índice del primer elemento que difiere entre los Bigarray <ar1> y <ar2> *)
 let arrays_differ_at_pos ar1 ar2 = 
   let len1 = Bigarray.Array1.dim ar1 in
   let len2 = Bigarray.Array1.dim ar2 in
@@ -63,6 +74,10 @@ let arrays_differ_at_pos ar1 ar2 =
     in
     aux 0
 
+(* val update_leaves : int -> 'a database -> 'a -> 'a database *)
+(* Recorre todo el árbol <t> y actualiza el tercer campo de la tupla asociada al constructor Node del tipo 'a database *)
+(* de tal manera que si el índice <n> es menor que el de una hoja dada y la clave de la hoja es distinta a <inserted_key> *)
+(* el valor del índice de la hoja se incrementa en 1 *)
 let rec update_leaves n t inserted_key = 
   match t with
   | (Node [(Nil, _, ind)]) as c when ind < n -> c
